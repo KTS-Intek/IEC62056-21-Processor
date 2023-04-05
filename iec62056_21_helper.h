@@ -58,7 +58,7 @@ public:
 
 
 
-     QByteArray messageHexWithBCC(const QByteArray &writeArr);
+     QByteArray messageHexWithBCC(const QByteArray &writeArrH);
 
      QByteArray messageWithBCC(const QByteArray &writeArr);
 
@@ -76,6 +76,10 @@ public:
     bool getReadArrValue(const QByteArray &readArr, const QString &lastObis, const QByteArray &valueUnits, const int &prec, QString &valStr);
 
     int calculateEnrgIndxExt(qint16 currEnrg, const QStringList &listEnrg, const QStringList &spprtdListEnrg, const QStringList &listPlgEnrg);
+
+
+    QVariantHash isItYourExt(const QByteArray &arr, QByteArray &lastDN, QTime &timeFromLastAuth);
+
 
     QByteArray getReadMessageFromObis(const QString &obiscode);
 

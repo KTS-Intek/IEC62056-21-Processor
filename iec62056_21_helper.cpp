@@ -30,7 +30,7 @@ void IEC62056_21_Helper::insertEmptyMessageWithAheavyAnswer(QVariantHash &hashMe
 //------------------------------------------------------------------------------------------------------------------------
 void IEC62056_21_Helper::insertEndSymb2_2903andMessage4obis(QVariantHash &hashMessage, const QString &obiscode)
 {
-    if(verbouseMode) qDebug() << "CE303 obiscode" << obiscode;
+    if(verbouseMode) qDebug() << "IEC62056 obiscode" << obiscode;
 
     insertEndSymb2_2903(hashMessage);
     hashMessage.insert("message_0", getReadMessageFromObis(obiscode));
@@ -51,12 +51,22 @@ void IEC62056_21_Helper::insertAnswr0_06andMessage(QVariantHash &hashMessage, co
 void IEC62056_21_Helper::insertEndSymb2_2903(QVariantHash &hashMessage)
 {
     hashMessage.insert("endSymb2", QByteArray::fromHex("2903"));//.P0.().`
+    hashMessage.insert("data7EPt", true);
+
+    if(!hashMessage.contains("endSymb"))
+        hashMessage.insert("endSymb", "");
+
 
 }
 //------------------------------------------------------------------------------------------------------------------------
 void IEC62056_21_Helper::insertAnswr0_06(QVariantHash &hashMessage)
 {
     hashMessage.insert("answr_0", QByteArray::fromHex("06"));
+    hashMessage.insert("data7EPt", true);
+
+    if(!hashMessage.contains("endSymb"))
+        hashMessage.insert("endSymb", "");
+
 
 }
 //------------------------------------------------------------------------------------------------------------------------
@@ -92,7 +102,7 @@ bool IEC62056_21_Helper::isLogin2supportedMeterExt(const QByteArray &readArr, co
 
 bool IEC62056_21_Helper::isLoginGoodSmart(const QVariantHash &readHash, const quint16 &goodStep, QVariantHash &hashTmpData)
 {
-    const QByteArray readArr = QByteArray::fromHex("0150300228") ;
+    const QByteArray readArr = QByteArray::fromHex("0150300228") ;//01 50 30 02 28
 
     if(readHash.value("readArr_0").toByteArray().startsWith(readArr)){
 
@@ -174,9 +184,9 @@ QString IEC62056_21_Helper::versionFromMessageExt(const QString &readArr, const 
 
 //------------------------------------------------------------------------------------------------------------------------
 
-QByteArray IEC62056_21_Helper::messageHexWithBCC(const QByteArray &writeArr)
+QByteArray IEC62056_21_Helper::messageHexWithBCC(const QByteArray &writeArrH)
 {
-    return messageWithBCC(QByteArray::fromHex(writeArr));
+    return messageWithBCC(QByteArray::fromHex(writeArrH));
 
 }
 
@@ -229,7 +239,7 @@ QByteArray IEC62056_21_Helper::message2meterChecks(QVariantHash &hashTmpData, QB
 
     if(lastAutoDetectNi == hashConstData.value("NI").toByteArray()){
         if(qAbs(lastAutoDetectDt.secsTo(QDateTime::currentDateTimeUtc())) < 30)
-            hashTmpData.insert("CE303_BuvEkt", true);
+            hashTmpData.insert("IEC62056_BuvEkt", true);
         lastAutoDetectNi.clear();
 
     }
@@ -439,10 +449,90 @@ int IEC62056_21_Helper::calculateEnrgIndxExt(qint16 currEnrg, const QStringList 
             return listPlgEnrg.indexOf(listEnrg.at(currEnrg));
         }
     }
-    if(verbouseMode) qDebug() << "CE303 decode energyIndex power -1" << currEnrg;
+    if(verbouseMode) qDebug() << "IEC62056 decode energyIndex power -1" << currEnrg;
     return (-2);
 }
 
+QVariantHash IEC62056_21_Helper::isItYourExt(const QByteArray &arr, QByteArray &lastDN, QTime &timeFromLastAuth)
+{
+    QByteArray mArr = ConvertAtype::convertData7ToData8(arr);
+    QVariantHash hash;
+    hash.insert("endSymb2", QByteArray::fromHex("03"));
+    hash.insert("7DtEpt",true);
+
+    //old addres
+    if(mArr == "/?!\r\n"){
+        lastDN = "\r\n";
+        hash.remove("endSymb2");
+         hash.insert("endSymb", "\r\n");
+        hash.insert("nodeID", lastDN);
+        timeFromLastAuth.restart();
+        return hash;
+    }
+
+    if(mArr.left(2) == "/?" && mArr.right(3) == "!\r\n"){
+        mArr.chop(3);
+        lastDN = mArr.mid(2) + "\r\n";
+        hash.insert("nodeID", lastDN);
+        hash.remove("endSymb2");
+         hash.insert("endSymb", "\r\n");
+         timeFromLastAuth.restart();
+        return hash;
+    }
+
+    //IEC Data unit
+    if(mArr == QByteArray::fromHex("01 42 30 03 71")){//.B0.u
+        //lastDN.clear();
+        hash.insert("nodeID", lastDN);// "\r\n");
+        lastDN.clear();
+        return hash;
+    }
+    if(lastDN.isEmpty())
+        return hash;
+
+   QByteArray leftArr = QByteArray::fromHex("01");
+   QByteArray rightArr = QByteArray::fromHex("03");
+   int mArrLen = mArr.length();
+
+    if(mArr.right(1) != QByteArray::fromHex("03"))
+        rightArr.append(byteBCC(mArr.left(mArrLen - 1)));
+
+    //.W1.  || .P1.
+
+    if((mArr.left(4) == QByteArray::fromHex("01573102") || mArr.left(4) == QByteArray::fromHex("01503102")  )&& mArr.right(rightArr.length()) == rightArr){
+        hash.insert("readLen", 1);
+        hash.remove("endSymb2");
+        hash.insert("endSymb", QByteArray::fromHex("06"));
+        hash.insert("nodeID", lastDN);
+        return hash;
+    }
+
+    if(mArr.left(leftArr.length()) == leftArr && mArr.right(rightArr.length()) == rightArr){
+
+        hash.insert("nodeID", lastDN);
+        return hash;
+    }
+
+
+    leftArr = QByteArray::fromHex("06");
+    rightArr = "\r\n";
+    if(mArr.left(leftArr.length()) == leftArr && mArr.right(rightArr.length()) == rightArr){
+        hash.insert("nodeID", lastDN);
+//        hash.remove("endSymb2");
+//         hash.insert("endSymb", QByteArray::fromHex("06"));
+        return hash;
+    }
+
+
+
+//    if(timeFromLastAuth.elapsed() < 5000 ){
+//        if(mArr.length() == 5 && mArr.right(2) == "\r\n"){
+//            hash.insert("nodeID", lastDN);
+//            return hash;
+//        }
+//    }
+    return QVariantHash();
+}
 //------------------------------------------------------------------------------------------------------------------------
 
 QByteArray IEC62056_21_Helper::getReadMessageFromObis(const QString &obiscode)
@@ -465,7 +555,7 @@ QVariantHash IEC62056_21_Helper::getGoodByeMessage(QVariantHash &hashTmpData)
 QVariantHash IEC62056_21_Helper::getGoodByeMessageSmpl()
 {
     QVariantHash hashMessage;
-    if(verbouseMode) qDebug() << "CE303 poll done, good bye meter" ;
+    if(verbouseMode) qDebug() << "IEC62056 poll done, good bye meter" ;
 
     hashMessage.insert("message_0", QByteArray::fromHex("01 42 30 03 71"));//0142300375
     //                hashMessage.insert("multicast_0", true);
@@ -480,7 +570,7 @@ QVariantHash IEC62056_21_Helper::getStep0HashMesssage(QVariantHash &hashTmpData,
 {
     QVariantHash hashMessage;
     QByteArray writeArr = "/?" + arrNI + "!" + QByteArray::fromHex("0D0A");
-    if(hashTmpData.value("CE303_BuvEkt", false).toBool()){//hashTmpData.insert("CE303_BuvEkt", true);
+    if(hashTmpData.value("IEC62056_BuvEkt", false).toBool()){//hashTmpData.insert("IEC62056_BuvEkt", true);
 
         hashMessage.insert("message_0", QByteArray::fromHex("0142300371"));//.B0.q
         hashMessage.insert("ok_answer_0", true);
@@ -512,8 +602,12 @@ QVariantHash IEC62056_21_Helper::getStep1HashMesssage()
 QVariantHash IEC62056_21_Helper::getStep2HashMesssage(const QByteArray &passwordh)
 {
 
+    const QByteArray passwdbcch = messageWithBCC(QByteArray::fromHex( "01 50 31 02 28" + passwordh + " 29 03 ")).toHex();
+
+
+
     QVariantHash hashMessage;
-    insertAnswr0_06andMessage(hashMessage, "01 50 31 02 28" + passwordh + " 29 03 61");
+    insertAnswr0_06andMessage(hashMessage, passwdbcch);
     return hashMessage;
 //    hashMessage.insert("message_0", QByteArray::fromHex("01 50 31 02 28 29 03 61")); //.P1.().a
     //    hashMessage.insert("answr_0", QByteArray::fromHex("06"));
@@ -524,7 +618,7 @@ void IEC62056_21_Helper::markStep0Done(QVariantHash &hashTmpData)
 
     hashTmpData.insert("step", 1);
     hashTmpData.insert("messFail", false);
-    hashTmpData.insert("CE303_BuvEkt", true);
+    hashTmpData.insert("IEC62056_BuvEkt", true);
 }
 //------------------------------------------------------------------------------------------------------------------------
 void IEC62056_21_Helper::markStep2Done(QVariantHash &hashTmpData, const quint16 &nextStep)
