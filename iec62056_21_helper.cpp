@@ -76,6 +76,11 @@ void IEC62056_21_Helper::insertMessage0(QVariantHash &hashMessage, const QByteAr
 
 }
 //------------------------------------------------------------------------------------------------------------------------
+QString IEC62056_21_Helper::getProtocolFamily()
+{
+    return QString("IEC62056_21");
+}
+//------------------------------------------------------------------------------------------------------------------------
 bool IEC62056_21_Helper::isLogin2supportedMeterExt(const QVariantHash &hashRead, const QString &supportedMeters)
 {
     return (isLogin2supportedMeterExt(hashRead.value("readArr_1").toByteArray(), supportedMeters) || isLogin2supportedMeterExt(hashRead.value("readArr_0").toByteArray(), supportedMeters));
@@ -86,7 +91,13 @@ bool IEC62056_21_Helper::isLogin2supportedMeterExt(const QVariantHash &hashRead,
 
 bool IEC62056_21_Helper::isLogin2supportedMeterExt(const QByteArray &readArr, const QString &supportedMeters)
 {
-    const QStringList l = supportedMeters.split(" ", QString::SkipEmptyParts);
+    const QStringList l = supportedMeters.split(" ",
+                                            #if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
+                                                Qt::SkipEmptyParts
+                                            #else
+                                                QString::SkipEmptyParts
+                                            #endif
+                                                );
     const QString strl = readArr.simplified();
     for(int i = 0, imax = l.size(); i < imax; i++){
         if(strl.startsWith(l.at(i)))
@@ -129,7 +140,13 @@ bool IEC62056_21_Helper::decodeMeterSNBase(const QVariantHash &hashRead, const Q
     isSnBroken = false;
     if(hashRead.value("readArr_0").toByteArray().startsWith(QByteArray::fromHex(hexLeftP))){ //.0.0.0(
 
-        QString strSN = hashRead.value("readArr_0").toString().simplified().trimmed().split('(', QString::SkipEmptyParts).last();
+        QString strSN = hashRead.value("readArr_0").toString().simplified().trimmed().split('(',
+                                                                                    #if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
+                                                                                        Qt::SkipEmptyParts
+                                                                                    #else
+                                                                                        QString::SkipEmptyParts
+                                                                                    #endif
+                                                                                        ).last();
         while(!strSN.isEmpty() && strSN.right(1) != ")")
             strSN.chop(1);
         if(strSN.right(1) == ")")
@@ -236,7 +253,6 @@ QByteArray IEC62056_21_Helper::message2meterChecks(QVariantHash &hashTmpData, QB
 {
     if(hashTmpData.value("vrsn").toString().isEmpty() && !defVersion.isEmpty())
         hashTmpData.insert("vrsn", defVersion);
-
     if(lastAutoDetectNi == hashConstData.value("NI").toByteArray()){
         if(qAbs(lastAutoDetectDt.secsTo(QDateTime::currentDateTimeUtc())) < 30)
             hashTmpData.insert("IEC62056_BuvEkt", true);
@@ -248,9 +264,18 @@ QByteArray IEC62056_21_Helper::message2meterChecks(QVariantHash &hashTmpData, QB
     if(arrNI.length() > 19 || !hashConstData.value("hardAddrsn", true).toBool())//hardAddrsn
         arrNI.clear();
 
+    //smart dt sn check
+//    if(arrNI.isEmpty()){
+    mPlgHelper.isTime2smartDtSnCheckExt(hashConstData, hashTmpData);
+    if(hashTmpData.value("ignoreDtSnCheck").toBool() && !hashTmpData.value("meterIdentifier").toByteArray().isEmpty()){
+        arrNI = hashTmpData.value("meterIdentifier").toByteArray();//enable hard adressing, and do not read dt and sn
+    }
+//    }
 
     return arrNI;
 }
+
+//------------------------------------------------------------------------------------------------------------------------
 
 bool IEC62056_21_Helper::isItYourReadMessageExt(const QByteArray &arr, const QString &supportedMetersPrefixes)
 {
@@ -383,6 +408,56 @@ bool IEC62056_21_Helper::isItYourReadMessageExt(const QByteArray &arr, const QSt
 
 //------------------------------------------------------------------------------------------------------------------------
 
+bool IEC62056_21_Helper::getHashReadValues(const QVariantHash &hashRead, const int &defPrec, const QMap<QString, int> &mapPrec, QStringList &lastObises, QStringList &valuesUnits, QStringList &valsStr)
+{
+    return  getReadArrValues(hashRead.value("readArr_0").toByteArray(), defPrec, mapPrec, lastObises, valuesUnits, valsStr);
+
+}
+
+//------------------------------------------------------------------------------------------------------------------------
+
+bool IEC62056_21_Helper::getReadArrValues(const QByteArray &readArr, const int &defPrec, const QMap<QString, int> &mapPrec, QStringList &lastObises, QStringList &valuesUnits, QStringList &valsStr)
+{
+    //<STX><OBISx(val*units)><CR><LF>....!<CR><LF>
+
+    if(readArr.startsWith(QByteArray::fromHex("02")) && readArr.right(5).left(4).startsWith(QByteArray::fromHex("21 0D 0A 03 "))){
+        const QStringList listReadStr = QString(readArr.mid(1, readArr.length() - 4)).split("\r\n",
+                                                                                    #if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
+                                                                                        Qt::SkipEmptyParts
+                                                                                    #else
+                                                                                        QString::SkipEmptyParts
+                                                                                    #endif
+                                                                                        );
+        bool out = false;
+        for(int i = 0, imax = listReadStr.size() - 1; i < imax; i++){
+
+            const QString line = listReadStr.at(i);
+            const QString lastObis = line.split("(").first();
+            const QString valueUnits = (line.contains(QString("*"))) ?
+                        line.split(")").first().split("*").last() :
+                        QString();
+            const int prec = mapPrec.value(valueUnits, defPrec);
+//            l.toLocal8Bit()
+            const QByteArray genReadArr = QByteArray::fromHex("02") + line.toLocal8Bit();
+
+            QString valStr;
+            out = getReadArrValue(genReadArr, lastObis, valueUnits.toLocal8Bit(), prec, valStr);
+
+            if(!out)
+                return false;
+
+            lastObises.append(lastObis);
+            valuesUnits.append(valueUnits);
+            valsStr.append(valStr);
+        }
+        return out;
+
+    }
+    return false;
+}
+
+//------------------------------------------------------------------------------------------------------------------------
+
 bool IEC62056_21_Helper::getHashReadValue(const QVariantHash &hashRead, const QString &lastObis, const QByteArray &valueUnits, const int &prec, QString &valStr)
 {
     return  getReadArrValue(hashRead.value("readArr_0").toByteArray(), lastObis, valueUnits, prec, valStr);
@@ -452,6 +527,8 @@ int IEC62056_21_Helper::calculateEnrgIndxExt(qint16 currEnrg, const QStringList 
     if(verbouseMode) qDebug() << "IEC62056 decode energyIndex power -1" << currEnrg;
     return (-2);
 }
+
+//------------------------------------------------------------------------------------------------------------------------
 
 QVariantHash IEC62056_21_Helper::isItYourExt(const QByteArray &arr, QByteArray &lastDN, QTime &timeFromLastAuth)
 {
@@ -562,6 +639,7 @@ QVariantHash IEC62056_21_Helper::getGoodByeMessageSmpl()
     hashMessage.insert("data7EPt", true);
 
     hashMessage.insert("ok_answer_0", true);
+    hashMessage.insert("protocolFamily", getProtocolFamily()); //protocol family, use it for log out, instead of models
     return hashMessage;
 
 }
@@ -582,6 +660,8 @@ QVariantHash IEC62056_21_Helper::getStep0HashMesssage(QVariantHash &hashTmpData,
     hashMessage.insert("endSymb", QByteArray::fromHex("0D0A"));
     return hashMessage;
 }
+
+//------------------------------------------------------------------------------------------------------------------------
 
 QVariantHash IEC62056_21_Helper::getStep1HashMesssageLowLevel()
 {

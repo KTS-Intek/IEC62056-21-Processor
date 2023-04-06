@@ -6,6 +6,9 @@
 #include <QVariantHash>
 #include <QDebug>
 
+#include "shared/meterpluginhelper.h"
+
+
 class IEC62056_21_Helper : public QObject
 {
     Q_OBJECT
@@ -20,6 +23,7 @@ public:
         OneIECParsedAnswer(const QString &value, const QString &units) : value(value), units(units) {}
     };
 
+    MeterPluginHelper mPlgHelper;
 
 
     quint8 readNumber;
@@ -41,6 +45,7 @@ public:
     void insertMessage0(QVariantHash &hashMessage, const QByteArray &messageh);
 
 
+    static QString getProtocolFamily();
 
     static bool isLogin2supportedMeterExt(const QVariantHash &hashRead, const QString &supportedMeters);
 
@@ -70,8 +75,13 @@ public:
     bool isItYourReadMessageExt(const QByteArray &arr, const QString &supportedMetersPrefixes);
 
 
-    bool getHashReadValue(const QVariantHash &hashRead, const QString &lastObis, const QByteArray &valueUnits, const int &prec, QString &valStr);
+    //one request , many values
+    bool getHashReadValues(const QVariantHash &hashRead, const int &defPrec, const QMap<QString, int> &mapPrec, QStringList &lastObises, QStringList &valuesUnits, QStringList &valsStr);
 
+    bool getReadArrValues(const QByteArray &readArr, const int &defPrec, const QMap<QString, int> &mapPrec, QStringList &lastObises, QStringList &valuesUnits, QStringList &valsStr);
+
+
+    bool getHashReadValue(const QVariantHash &hashRead, const QString &lastObis, const QByteArray &valueUnits, const int &prec, QString &valStr);
 
     bool getReadArrValue(const QByteArray &readArr, const QString &lastObis, const QByteArray &valueUnits, const int &prec, QString &valStr);
 
