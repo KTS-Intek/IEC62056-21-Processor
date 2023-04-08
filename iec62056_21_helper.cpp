@@ -76,6 +76,28 @@ void IEC62056_21_Helper::insertMessage0(QVariantHash &hashMessage, const QByteAr
 
 }
 //------------------------------------------------------------------------------------------------------------------------
+bool IEC62056_21_Helper::gimmeValueInsideBracketsSmart(const QVariantHash &hashRead, const QByteArray &hexLeftP, QString &valStr)
+{
+    if(hashRead.value("readArr_0").toByteArray().startsWith(QByteArray::fromHex(hexLeftP))){ //.0.0.0(
+
+       valStr = hashRead.value("readArr_0").toString().simplified().trimmed().split('(',
+                                                                                    #if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
+                                                                                        Qt::SkipEmptyParts
+                                                                                    #else
+                                                                                        QString::SkipEmptyParts
+                                                                                    #endif
+                                                                                        ).last();
+        while(!valStr.isEmpty() && valStr.right(1) != ")")
+            valStr.chop(1);
+        if(valStr.right(1) == ")")
+            valStr.chop(1);
+
+        valStr = valStr.simplified().trimmed();
+        return true;
+    }
+    return false;
+}
+//------------------------------------------------------------------------------------------------------------------------
 QString IEC62056_21_Helper::getProtocolFamily()
 {
     return QString("IEC62056_21");
@@ -138,22 +160,8 @@ bool IEC62056_21_Helper::isLoginGoodSmart(const QVariantHash &readHash, const qu
 bool IEC62056_21_Helper::decodeMeterSNBase(const QVariantHash &hashRead, const QByteArray &hexLeftP, const quint16 &goodStep, QVariantHash &hashTmpData, bool &isSnBroken)
 {
     isSnBroken = false;
-    if(hashRead.value("readArr_0").toByteArray().startsWith(QByteArray::fromHex(hexLeftP))){ //.0.0.0(
-
-        QString strSN = hashRead.value("readArr_0").toString().simplified().trimmed().split('(',
-                                                                                    #if QT_VERSION >= QT_VERSION_CHECK(5, 13, 0)
-                                                                                        Qt::SkipEmptyParts
-                                                                                    #else
-                                                                                        QString::SkipEmptyParts
-                                                                                    #endif
-                                                                                        ).last();
-        while(!strSN.isEmpty() && strSN.right(1) != ")")
-            strSN.chop(1);
-        if(strSN.right(1) == ")")
-            strSN.chop(1);
-
-        strSN = strSN.simplified().trimmed();
-
+    QString strSN;
+    if(gimmeValueInsideBracketsSmart(hashRead, hexLeftP, strSN)){
         bool oksn ;
         strSN.toLongLong(&oksn);
 
@@ -164,13 +172,79 @@ bool IEC62056_21_Helper::decodeMeterSNBase(const QVariantHash &hashRead, const Q
             return true;
         }
         isSnBroken = true;
-//        if(error_counter >= 0)
-//            hashTmpData.insert(MeterPluginHelper::errWarnKey(error_counter, true),
-//                           MeterPluginHelper::prettyMess(QString("!MeterSN.isValid: %1").arg(QString(strSN).simplified().trimmed()),
-//                                                         PrettyValues::prettyHexDump(hashRead.value("readArr_0").toByteArray()), true, isSnBroken));
-
-
     }
+
+    hashTmpData.insert("logined", false);
+    hashTmpData.insert("step", (quint16)0);
+    return false;
+}
+
+//------------------------------------------------------------------------------------------------------------------------
+
+bool IEC62056_21_Helper::decodeMeterDTBase(const QVariantHash &hashRead, const QByteArray &hexLeftP, const quint16 &goodStep, const bool &hasTime, const bool &hasDate, const QString &mask, QVariantHash &hashTmpData, bool &isDtBroken)
+{
+    isDtBroken = false;
+
+    //.0.9.1(19:58:02)
+        //.0.9.2(23-04-06)
+    QString strDT;
+    if(gimmeValueInsideBracketsSmart(hashRead, hexLeftP, strDT) && (hasDate || hasTime)){
+
+        if(!hashTmpData.contains("IEC62056_tmpDT")){
+            hashTmpData.insert("IEC62056_currentDateTimeUTC", QDateTime::currentDateTime());
+            hashTmpData.insert("IEC62056_tmpDT", hashTmpData.value("IEC62056_currentDateTimeUTC"));
+        }
+
+        QDateTime IEC62056_tmpDT = hashTmpData.value("IEC62056_tmpDT").toDateTime();
+        if(hasDate && hasTime){
+            //set dt
+            IEC62056_tmpDT = QDateTime::fromString(strDT, mask);
+
+        }else{
+            if(hasDate){
+                //set date
+                QDate date = QDate::fromString(strDT, mask);
+                if(!date.isValid()){
+                    isDtBroken = true;
+                    return true;
+                }
+                if(date.year() < 2000 && !mask.contains("yyyy")){ //when yy, it sets 19xx year
+                    date = QDate::fromString(QDate::currentDate().toString("yyyy").left(2) + date.toString("yy-MM-dd"), "yyyy-MM-dd");
+                }
+
+
+                IEC62056_tmpDT.setDate(date);
+                if(!IEC62056_tmpDT.isValid()){
+                    IEC62056_tmpDT = IEC62056_tmpDT.addSecs(1); //when DST changes
+                    IEC62056_tmpDT.setDate(date);
+                }
+            }else{
+//                if(hasTime){
+                    //set time
+                const QTime time = QTime::fromString(strDT, mask);
+                if(!time.isValid()){
+                    isDtBroken = true;
+                    return true;
+                }
+                IEC62056_tmpDT.setTime(time);
+                if(!IEC62056_tmpDT.isValid()){
+                    IEC62056_tmpDT.setTime(time.addSecs(1)); //when DST changes
+                }
+//                }
+            }
+        }
+
+
+        if(IEC62056_tmpDT.isValid()){
+            hashTmpData.insert("messFail", false);
+            hashTmpData.insert("IEC62056_tmpDT", IEC62056_tmpDT);
+            hashTmpData.insert("step", goodStep);
+
+            return true;
+        }
+        isDtBroken = true;
+    }
+
     hashTmpData.insert("logined", false);
     hashTmpData.insert("step", (quint16)0);
     return false;

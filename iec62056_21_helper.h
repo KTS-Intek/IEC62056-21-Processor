@@ -45,6 +45,8 @@ public:
     void insertMessage0(QVariantHash &hashMessage, const QByteArray &messageh);
 
 
+    static bool gimmeValueInsideBracketsSmart(const QVariantHash &hashRead, const QByteArray &hexLeftP, QString &valStr);
+
     static QString getProtocolFamily();
 
     static bool isLogin2supportedMeterExt(const QVariantHash &hashRead, const QString &supportedMeters);
@@ -55,6 +57,8 @@ public:
     static bool isLoginGoodSmart(const QVariantHash &readHash, const quint16 &goodStep, QVariantHash &hashTmpData);
 
     static bool decodeMeterSNBase(const QVariantHash &hashRead, const QByteArray &hexLeftP, const quint16 &goodStep, QVariantHash &hashTmpData, bool &isSnBroken);
+
+    static bool decodeMeterDTBase(const QVariantHash &hashRead, const QByteArray &hexLeftP, const quint16 &goodStep, const bool &hasTime, const bool &hasDate, const QString &mask, QVariantHash &hashTmpData, bool &isDtBroken);
 
 
     static QString versionFromMessageExt(const QVariantHash &hashRead, const QByteArray &prefix, const int &len);
