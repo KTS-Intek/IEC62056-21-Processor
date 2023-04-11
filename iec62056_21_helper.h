@@ -5,7 +5,7 @@
 
 #include <QVariantHash>
 #include <QDebug>
-
+#include <QElapsedTimer>
 #include "shared/meterpluginhelper.h"
 
 
@@ -41,6 +41,9 @@ public:
 
     void insertEndSymb2_2903(QVariantHash &hashMessage);
     void insertAnswr0_06(QVariantHash &hashMessage);
+
+    void insertEndSymb2Ext(QVariantHash &hashMessage, const QByteArray &endSymb2h);
+
 
     void insertMessage0(QVariantHash &hashMessage, const QByteArray &messageh);
 
@@ -92,7 +95,7 @@ public:
     int calculateEnrgIndxExt(qint16 currEnrg, const QStringList &listEnrg, const QStringList &spprtdListEnrg, const QStringList &listPlgEnrg);
 
 
-    QVariantHash isItYourExt(const QByteArray &arr, QByteArray &lastDN, QTime &timeFromLastAuth);
+    QVariantHash isItYourExt(const QByteArray &arr, QByteArray &lastDN, QElapsedTimer &timeFromLastAuth);
 
 
     QByteArray getReadMessageFromObis(const QString &obiscode);

@@ -50,12 +50,7 @@ void IEC62056_21_Helper::insertAnswr0_06andMessage(QVariantHash &hashMessage, co
 //------------------------------------------------------------------------------------------------------------------------
 void IEC62056_21_Helper::insertEndSymb2_2903(QVariantHash &hashMessage)
 {
-    hashMessage.insert("endSymb2", QByteArray::fromHex("2903"));//.P0.().`
-    hashMessage.insert("data7EPt", true);
-
-    if(!hashMessage.contains("endSymb"))
-        hashMessage.insert("endSymb", "");
-
+    insertEndSymb2Ext(hashMessage, "2903");
 
 }
 //------------------------------------------------------------------------------------------------------------------------
@@ -68,6 +63,15 @@ void IEC62056_21_Helper::insertAnswr0_06(QVariantHash &hashMessage)
         hashMessage.insert("endSymb", "");
 
 
+}
+//------------------------------------------------------------------------------------------------------------------------
+void IEC62056_21_Helper::insertEndSymb2Ext(QVariantHash &hashMessage, const QByteArray &endSymb2h)
+{
+    hashMessage.insert("endSymb2", QByteArray::fromHex(endSymb2h));//.P0.().`
+    hashMessage.insert("data7EPt", true);
+
+    if(!hashMessage.contains("endSymb"))
+        hashMessage.insert("endSymb", "");
 }
 //------------------------------------------------------------------------------------------------------------------------
 void IEC62056_21_Helper::insertMessage0(QVariantHash &hashMessage, const QByteArray &messageh)
@@ -604,7 +608,7 @@ int IEC62056_21_Helper::calculateEnrgIndxExt(qint16 currEnrg, const QStringList 
 
 //------------------------------------------------------------------------------------------------------------------------
 
-QVariantHash IEC62056_21_Helper::isItYourExt(const QByteArray &arr, QByteArray &lastDN, QTime &timeFromLastAuth)
+QVariantHash IEC62056_21_Helper::isItYourExt(const QByteArray &arr, QByteArray &lastDN, QElapsedTimer &timeFromLastAuth)
 {
     QByteArray mArr = ConvertAtype::convertData7ToData8(arr);
     QVariantHash hash;
@@ -747,7 +751,7 @@ QVariantHash IEC62056_21_Helper::getStep1HashMesssageLowLevel()
 QVariantHash IEC62056_21_Helper::getStep1HashMesssage()
 {
     QVariantHash hashMessage;
-    insertEndSymb2_2903andMessage(hashMessage, "06 30 35 31 0D 0A");
+    insertEndSymb2_2903andMessage(hashMessage, "06 30 35 31 0D 0A"); //V = 0, Z = 5 (9600), Y=1
     return hashMessage;
 //    hashMessage.insert("message_0", QByteArray::fromHex("06 30 35 31 0D 0A")); //.051 "063051310D0A")); //<ACK>051<CRLF> || 001
     //    hashMessage.insert("endSymb2", QByteArray::fromHex("2903"));//.P0.().`
