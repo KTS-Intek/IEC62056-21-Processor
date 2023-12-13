@@ -28,7 +28,7 @@ public:
 
     quint8 readNumber;
 
-    bool verbouseMode;
+    bool verboseMode; //former verbouseMode
 
     void insertEmptyMessageWithAheavyAnswer(QVariantHash &hashMessage);
 
@@ -49,6 +49,8 @@ public:
 
 
     static bool gimmeValueInsideBracketsSmart(const QVariantHash &hashRead, const QByteArray &hexLeftP, QString &valStr);
+
+    static QStringList gimmeValuesInsideBrackets(const QString &lineWithValuesInsideBrackets);
 
     static QString getProtocolFamily();
 

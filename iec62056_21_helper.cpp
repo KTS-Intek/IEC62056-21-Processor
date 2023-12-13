@@ -8,10 +8,10 @@
 
 IEC62056_21_Helper::IEC62056_21_Helper(QObject *parent): QObject(parent)
 {
-    verbouseMode = false;
+    verboseMode = false;
 #ifdef Q_OS_LINUX
 #ifdef __amd64
-    verbouseMode = true;
+    verboseMode = true;
 #endif
 #endif
 
@@ -30,7 +30,7 @@ void IEC62056_21_Helper::insertEmptyMessageWithAheavyAnswer(QVariantHash &hashMe
 //------------------------------------------------------------------------------------------------------------------------
 void IEC62056_21_Helper::insertEndSymb2_2903andMessage4obis(QVariantHash &hashMessage, const QString &obiscode)
 {
-    if(verbouseMode) qDebug() << "IEC62056 obiscode" << obiscode;
+    if(verboseMode) qDebug() << "IEC62056 obiscode" << obiscode;
 
     insertEndSymb2_2903(hashMessage);
     hashMessage.insert("message_0", getReadMessageFromObis(obiscode));
@@ -100,6 +100,22 @@ bool IEC62056_21_Helper::gimmeValueInsideBracketsSmart(const QVariantHash &hashR
         return true;
     }
     return false;
+}
+//------------------------------------------------------------------------------------------------------------------------
+QStringList IEC62056_21_Helper::gimmeValuesInsideBrackets(const QString &lineWithValuesInsideBrackets)
+{
+    //(value0)(value1)....(valueX)
+    QStringList out;
+    if(lineWithValuesInsideBrackets.contains("(") && lineWithValuesInsideBrackets.contains(")")){
+        QString str = lineWithValuesInsideBrackets.mid(lineWithValuesInsideBrackets.indexOf("(") + 1); //remove the first bracket
+
+        const int lindex = str.lastIndexOf(")");
+        if(lindex > 0){
+            str = str.left(lindex); //remove the last )
+            out = str.split(")(");
+        }
+    }
+    return out;
 }
 //------------------------------------------------------------------------------------------------------------------------
 QString IEC62056_21_Helper::getProtocolFamily()
@@ -366,7 +382,7 @@ bool IEC62056_21_Helper::isItYourReadMessageExt(const QByteArray &arr, const QSt
                 counter++;
         }
 
-        if(verbouseMode) qDebug() << "CE301 bitArr " << bitArr << counter;
+        if(verboseMode) qDebug() << "CE301 bitArr " << bitArr << counter;
 
         if((counter%2 == 0 && !bitArr.at(7)) || (counter%2 != 0 && bitArr.at(7)))
            return true;
@@ -467,18 +483,18 @@ bool IEC62056_21_Helper::isItYourReadMessageExt(const QByteArray &arr, const QSt
         QByteArray readArr2(readArr);
           readArr2.chop(1);
 
-        if(verbouseMode) qDebug() << "CE301 bcc " << bccB.toHex() << byteBCC(readArr2).toHex();
+        if(verboseMode) qDebug() << "CE301 bcc " << bccB.toHex() << byteBCC(readArr2).toHex();
 
         if(/*readArr2.right(1) == QByteArray::fromHex("03") &&*/ readArr2.right(4).left(3) == ")\r\n"){
 
-            if(verbouseMode){
+            if(verboseMode){
                 qDebug() << "CE30x Tak____________" << readArr2.left(3).toHex() << readArr2.right(3).toHex();
                 qDebug() << ConvertAtype::convertData7ToData8(arr);
             }
             return true;
         }
     }else{
-        if(verbouseMode) qDebug() << "CE30x " << readArr.right(2).left(1).toHex() << readArr.toHex();
+        if(verboseMode) qDebug() << "CE30x " << readArr.right(2).left(1).toHex() << readArr.toHex();
     }
 
     return false;
@@ -592,17 +608,17 @@ int IEC62056_21_Helper::calculateEnrgIndxExt(qint16 currEnrg, const QStringList 
     if(currEnrg < 0)
         currEnrg = 0;
 
-    if(verbouseMode) qDebug() << listEnrg << currEnrg << spprtdListEnrg ;
+    if(verboseMode) qDebug() << listEnrg << currEnrg << spprtdListEnrg ;
     for(qint16 iMax = listEnrg.size(); currEnrg < iMax; currEnrg++){
 
         if(spprtdListEnrg.contains(listEnrg.at(currEnrg))){//енергія підтримувана лічильником
 //            const QStringList listPlgEnrg = getSupportedEnrg(pollCode, "");//енергія підтримувана плагіном
-            if(verbouseMode) qDebug() << "calculateEnrgIndx " << spprtdListEnrg.indexOf(listEnrg.at(currEnrg)) << listPlgEnrg.indexOf(listEnrg.at(currEnrg)) << listEnrg.at(currEnrg) << currEnrg;
+            if(verboseMode) qDebug() << "calculateEnrgIndx " << spprtdListEnrg.indexOf(listEnrg.at(currEnrg)) << listPlgEnrg.indexOf(listEnrg.at(currEnrg)) << listEnrg.at(currEnrg) << currEnrg;
 
             return listPlgEnrg.indexOf(listEnrg.at(currEnrg));
         }
     }
-    if(verbouseMode) qDebug() << "IEC62056 decode energyIndex power -1" << currEnrg;
+    if(verboseMode) qDebug() << "IEC62056 decode energyIndex power -1" << currEnrg;
     return (-2);
 }
 
@@ -710,7 +726,7 @@ QVariantHash IEC62056_21_Helper::getGoodByeMessage(QVariantHash &hashTmpData)
 QVariantHash IEC62056_21_Helper::getGoodByeMessageSmpl()
 {
     QVariantHash hashMessage;
-    if(verbouseMode) qDebug() << "IEC62056 poll done, good bye meter" ;
+    if(verboseMode) qDebug() << "IEC62056 poll done, good bye meter" ;
 
     hashMessage.insert("message_0", QByteArray::fromHex("01 42 30 03 71"));//0142300375
     //                hashMessage.insert("multicast_0", true);
